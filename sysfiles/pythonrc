@@ -1,0 +1,37 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+from __future__ import unicode_literals, division, generators
+from __future__ import print_function, nested_scopes, with_statement
+
+import os
+import sys
+
+import collections
+import itertools
+import functools
+import math
+import glob
+import re
+import string
+import weakref
+
+try:
+   import six
+except ImportError:
+   try:
+      string_types = ( basestring, )
+   except NameError:
+      string_types = ( str, )
+else:
+   string_types = six.string_types
+
+_STR_FORMATTER = string.Formatter()
+_STR_VFORMAT   = _STR_FORMATTER.vformat
+vformat        = _STR_VFORMAT
+
+try:
+   import numpy
+except ImportError:
+   pass

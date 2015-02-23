@@ -1,0 +1,11 @@
+# ssh
+D  0700 - /.ssh
+F  0600 - /.ssh/authorized_keys
+f? 0600 - /.ssh/config
+
+d  0700 - htop
+
+d  0700 - Thunar
+
+f  0755 - openbox/environment
+f  0755 - openbox/autostart

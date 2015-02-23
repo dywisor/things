@@ -1,0 +1,8 @@
+dockapp_mode simple
+
+vertical True
+
+slot_size 24
+icon_size 24
+
+kludges force_icons_size

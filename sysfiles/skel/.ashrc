@@ -1,0 +1,14 @@
+#!/bin/sh
+
+if [ -r /etc/ashrc ]; then
+   . /etc/ashrc || :
+fi
+
+case "${-}" in
+   *i*) : ;;
+   *)   return 0 ;;
+esac
+
+T="${PRIV_TMPDIR:-${TMPDIR:-/tmp}}"
+Q="'"
+QQ='"'

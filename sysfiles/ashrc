@@ -1,0 +1,34 @@
+#!/bin/sh
+
+[ -r /etc/shinit/env.sh ] && . /etc/shinit/env.sh || :
+
+case "${-}" in
+   *i*)
+      PS1='\u@\h \w \$ '
+      [ ! -e /CHROOT ] || PS1="(chroot) ${PS1}"
+
+      if [ -d /etc/shinit ]; then
+         [ -r /etc/shinit/aliases.sh ] && . /etc/shinit/aliases.sh || :
+         [ -r /etc/shinit/ienv.sh    ] && . /etc/shinit/ienv.sh || :
+
+         case "$(tty 2>/dev/null)" in
+
+            ##/dev/tty[A-Za-z]*) true ;;
+
+            /dev/pts/?*|/dev/tty[0-9]*)
+               ## does not work for dash:
+               if \
+                  [ -r /etc/shinit/fancy-ps1.sh ] && \
+                  . /etc/shinit/fancy-ps1.sh
+               then
+                  :
+               else
+                  PS1='\[\033[01;32m\]\u@\h\[\033[01;34m\] \w \$\[\033[00m\] '
+                  [ ! -e /CHROOT ] || PS1="(chroot) ${PS1}"
+               fi
+            ;;
+
+         esac
+      fi
+   ;;
+esac

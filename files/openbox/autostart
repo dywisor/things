@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# These things are run when an Openbox X Session is started.
+# You may place a similar script in $HOME/.config/openbox/autostart
+# to run user-specific things.
+#
+
+has_prog() {
+   command -v "${1}" 1>/dev/null 2>&1
+}
+
+
+##sleep 1
+xhost +local:0
+
+# disable DPMS to work around freezing X when using a kvm switch
+xset -dpms
+xset s off
+
+sleep 0.3
+
+if has_prog stalonetray; then
+   stalonetray &
+   #stalonetray --config /etc/stalonetrayrc &
+fi
+
+sleep 0.3
+
+if has_prog parcellite; then
+   parcellite &
+fi
+
+if has_prog pidgin; then
+   pidgin -f &
+fi
+
+if has_prog thunar; then
+   thunar --daemon &
+fi
+
+:
