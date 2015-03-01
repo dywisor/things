@@ -35,7 +35,7 @@ if [ -n "${ROOT?}" ]; then
 
       else
 
-         print_nanorc_includes >> "${D}/nanorc" || \
+         print_nanorc_includes "${@}" >> "${D}/nanorc" || \
             die "Failed to append includes to ${D}/nanorc "
       fi
    fi
@@ -66,7 +66,7 @@ if [ "${MODE:?}" = "system" ]; then
    if [ -f "${S}/locale.conf" ]; then
       target_dodir "${D}/env.d"
       target_rmfile "${D}/env.d/02locale"
-      autodie ln -s -- ../locale.conf
+      autodie ln -s -- ../locale.conf "${D}/env.d/02locale"
    fi
 
 fi

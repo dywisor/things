@@ -1,2 +1,2 @@
-d 0700 polkitd:root polkit-1/rules.d
-f 0600 polkitd:root polkit-1/rules.d/10-libvirt.rules
+d 0700 root:polkitd polkit-1/rules.d
+f 0600 root:polkitd polkit-1/rules.d/10-libvirt.rules
