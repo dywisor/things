@@ -83,6 +83,15 @@ unset -v use_color safe_term match_lhs
 
 [ -r /etc/ashrc ] && . /etc/ashrc || :
 
-if [ -r /etc/profile.d/bash_completion.sh ]; then
-	. /etc/profile.d/bash_completion.sh || :
-fi
+bashcomp_file=
+for bashcomp_file in \
+	/etc/profile.d/bash-completion.sh \
+	/etc/profile.d/bash_completion.sh \
+	/etc/bash/bashrc.d/bash_completion.sh
+do
+	if [ -r "${bashcomp_file}" ]; then
+		. "${bashcomp_file}" || :
+		break
+	fi
+done
+unset -v bashcomp_file
