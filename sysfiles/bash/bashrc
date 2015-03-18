@@ -23,7 +23,7 @@ shopt -s checkwinsize
 # Enable history appending instead of overwriting.  #139609
 shopt -s histappend
 
-# Change the window title of X terminals 
+# Change the window title of X terminals
 case ${TERM} in
 	xterm*|rxvt*|Eterm*|aterm|kterm|gnome*|interix)
 		PROMPT_COMMAND='echo -ne "\033]0;${USER}@${HOSTNAME%%.*}:${PWD/#$HOME/~}\007"'
@@ -82,3 +82,7 @@ fi
 unset use_color safe_term match_lhs
 
 [ -r /etc/ashrc ] && . /etc/ashrc || :
+
+if [ -r /etc/profile.d/bash_completion.sh ]; then
+	. /etc/profile.d/bash_completion.sh || :
+fi
