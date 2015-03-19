@@ -1,0 +1,49 @@
+#!/bin/sh
+#  Usage: find-relative-symlinks [-0|--null] [<dir>]
+#
+#  Finds relative symlinks in <dir> (default: $PWD) that
+#  point to an outside location (i.e. link target is not a subpath of <dir>).
+#
+export LANG=C
+NL="
+"
+OLDIFS="${IFS}"
+
+print_null=
+case "${1-}" in
+   -0|--null)
+      print_null=true; shift
+   ;;
+esac
+
+if [ -n "${print_null}" ]; then
+print_link() { printf '%s\0' "${1:?}"; }
+else
+print_link() { printf '%s\n' "${1:?}"; }
+fi
+
+
+WORKDIR="$(readlink -f "${1:-.}")"
+
+
+IFS="${NL}"
+set -- $( find -H "${WORKDIR}" -type l )
+IFS="${OLDIFS}"
+
+for l; do
+   d="$(readlink -- "${l}")"
+   abs_dest="$(readlink -f -- "${l}")"
+
+   case "${abs_dest}" in
+      "${WORKDIR}/"*)
+         true
+      ;;
+      *)
+         case "${d}" in
+            '../'*)
+               print_link "${l}"
+            ;;
+         esac
+      ;;
+   esac
+done

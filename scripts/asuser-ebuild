@@ -1,0 +1,67 @@
+#!/bin/sh
+#  ebuild(1) wrapper
+#   (Symlink||install this file to $HOME/bin/ebuild)
+set -u
+
+: "${EBUILD_PROG:=/usr/bin/ebuild}"
+[ -x "${EBUILD_PROG}" ] || exit 222
+
+ifexport() {
+   while [ ${#} -gt 0 ]; do
+      if [ -n "${1}" ] && eval "test -n \"\${${1}+SET}\""; then
+         eval "export \"${1}\"" || exit
+      fi
+      shift
+   done
+}
+
+uid="$(id -u)"
+case "${uid}" in
+   '')
+      exit 4
+   ;;
+   0)
+      printf '%s must not be run as root.' "${0}" 1>&2
+      exit 5
+   ;;
+esac
+
+user="$(id -un)"; : "${user:?}"
+
+
+: "${TMPDIR:=/tmp}"
+case "${TMPDIR##*/}" in
+   "${uid}"|"${user}")
+      # TMPDIR=/root -- "ok".
+      TROOT="${TMPDIR}/portage"
+   ;;
+   *)
+      TROOT="${TMPDIR}/portage_${user}"
+   ;;
+esac
+
+export FEATURES="fakeroot -buildpkg${FEATURES:+ }${FEATURES-}"
+export DISTDIR="${TROOT}/distfiles"
+export PORTAGE_TMPDIR="${TROOT}/tmp"
+export PKGDIR="${TROOT}/packages"
+export ACCEPT_KEYWORDS="${ACCEPT_KEYWORDS=**}"
+export PORTAGE_USERNAME="${user}"
+ifexport PYTHON_TARGETS PYTHON_SINGLE_TARGET
+ifexport DIGEST_SOURCES
+ifexport ROOT
+
+
+get_dir() {
+   # print mkdir stdout to stderr, suppress "failed to create" messages
+   { mkdir -v -- "${1}" 1>&2 2>/dev/null || [ -d "${1}" ]; } && \
+   chown -h -- "${uid}:250" "${1}" && \
+   chmod -- 0777 "${1}"
+}
+
+
+get_dir "${TROOT}" || exit
+get_dir "${DISTDIR}" || exit
+get_dir "${PORTAGE_TMPDIR}" || exit
+get_dir "${PKGDIR}" || exit
+
+exec "${EBUILD_PROG}" "${@}"

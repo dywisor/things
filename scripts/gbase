@@ -1,0 +1,8 @@
+#!/bin/sh
+# A wrapper for interactive "git rebase"
+# that sets the editor to "nano".
+#
+GIT_EDITOR="$(which nano 2>/dev/null || printf '%s\n' nano)"
+export GIT_EDITOR
+
+exec git rebase -i "${@}"

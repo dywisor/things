@@ -1,0 +1,43 @@
+#!/bin/sh
+#  Tells a Windows machine to shut down now
+#
+#  Usage: windows-shutdown host [<user> [<password>]]
+#
+ACTION=shutdown
+
+remote="${1-}"
+case "${remote}" in
+   '')
+      ip=
+   ;;
+   [0-9]*.?*.?*.?*)
+      # assuming that %remote is an ip addr
+      ip="${remote}"
+   ;;
+   *)
+      ip="$(\
+         nslookup "${remote}" | sed -nr \
+            -e 's,^[aA]ddress[:]\s*([0-9.]+)\s*$,\1,p' | tail -n 1 \
+      )"
+   ;;
+esac
+
+if [ -z "${ip}" ]; then
+   printf '%s\n' "Error: No remote specified or remote not found." 1>&2
+   exit 56
+fi
+
+user="${2-}"
+if [ -z "${2+SET}" ]; then
+   printf '%s\n' "user: "
+   read -r user || exit
+fi
+
+pass="${3-}"
+
+
+set -- /usr/bin/net rpc "${ACTION:?}" -f -I "${ip}"
+[ -z "${user}" ] || set -- "${@}" -U "${user}${pass:+%${pass}}"
+
+[ -n "${3-}" ] || [ "${QUIET:-n}" = "y" ] || printf '%s\n' "${*}"
+exec "${@}"

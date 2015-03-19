@@ -1,0 +1,3 @@
+#!/bin/sh
+cc -march=${1:-native} -E -v - </dev/null 2>&1 | \
+   grep cc1 | sed -r -e 's,^\s+,,' -e 's, -E -quiet -v -,,'

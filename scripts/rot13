@@ -1,0 +1,12 @@
+#!/bin/sh
+rot13() {
+   tr \
+   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" \
+   "NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm"
+}
+
+if [ -z "${1-}" ] || [ "${1}" = "-" ]; then
+   rot13
+else
+   printf '%s\n' "$*" | rot13
+fi

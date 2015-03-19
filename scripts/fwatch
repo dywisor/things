@@ -1,0 +1,5 @@
+#!/bin/sh
+# Usage: fwatch <file> [<interval>]
+#
+#  "watch cat <file>" wrapper
+LC_ALL=C LANG=C watch -n "${2:-1}" -d cat "${1}"

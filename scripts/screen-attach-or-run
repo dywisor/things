@@ -1,0 +1,49 @@
+#!/bin/sh
+: "${X_SCREEN:=screen}"
+
+session_name=
+while [ ${#} -gt 0 ]; do
+   case "${1}" in
+      '')
+         exit 64
+      ;;
+      --fg)
+         SCREEN_REATTACH_ONLY=y
+      ;;
+      --bg)
+         SCREEN_IN_BG=y
+      ;;
+      *)
+         if [ -n "${session_name}" ]; then
+            break
+         else
+            session_name="${1}"
+         fi
+      ;;
+   esac
+   shift || exit
+done
+
+
+list_screen_sessions() {
+screen -ls | \
+awk -v name="${1:-.+}" \
+'( ($0 ~ "^\\s") && ($1 ~ ("^[0-9]+[.]" name "$")) ) { print $1; }'
+}
+
+
+session="$( list_screen_sessions "${session_name}" | head -n 1 )"
+
+if [ -n "${session}" ]; then
+   [ "${SCREEN_IN_BG:-X}" != "y" ] || exit 0
+   exec "${X_SCREEN}" -d -r -S "${session}"
+
+elif [ "${SCREEN_REATTACH_ONLY:-X}" = "y" ]; then
+   exit 1
+
+elif [ "${SCREEN_IN_BG:-X}" = "y" ]; then
+   exec "${X_SCREEN}" -d -m -S "${session_name}" -- "${@}"
+
+else
+   exec "${X_SCREEN}" -S "${session_name}" -- "${@}"
+fi

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Usage: tarcopy <src> <dst> [<option>...]
+#
+src="${1:?}"
+dst="${2:?}"
+shift 2 || exit
+
+mkdir -v -- "${dst}" 2>/dev/null || [ -d "${dst}" ] || exit
+
+tar c -C "${src}/" . | tar xp -C "${dst}/" -f - "${@}"

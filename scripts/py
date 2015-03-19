@@ -1,0 +1,109 @@
+#!/bin/sh
+. /etc/profile
+set -u
+
+x="${BASH_SOURCE:-${0}}"
+SCRIPT_FILE="$( realpath -Ls "${x}" 2>/dev/null )"
+if [ -z "${SCRIPT_FILE}" ]; then
+   SCRIPT_FILE="$( readlink -f "${x}" 2>/dev/null )"
+   [ -n "${SCRIPT_FILE}" ] || SCRIPT_FILE="${0}"
+fi
+SCRIPT_DIR="${SCRIPT_FILE%/*}"
+SCRIPT_FILENAME="${SCRIPT_FILE##*/}"
+SCRIPT_NAME="${SCRIPT_FILENAME%.sh}"
+
+: ${PYVER=}
+[ -n "${PYVER}" ] || \
+case "${SCRIPT_NAME}" in
+   py[0-9]*)
+      PYVER="${SCRIPT_NAME#py}"
+   ;;
+esac
+
+PY="python${PYVER}"
+
+pypath_has() {
+   case ":${PYTHONPATH-}:" in
+      *":${1}:"*)
+         return 0
+      ;;
+      *)
+         return 1
+      ;;
+   esac
+}
+
+_pypath_add() {
+   pypath_has "${1}" || PYTHONPATH="${1}${PYTHONPATH:+:${PYTHONPATH}}"
+}
+
+pypath_ifpush() {
+   local d
+
+   while [ ${#} -gt 0 ]; do
+      if [ -n "${1}" ] && [ -f "${1}/__init__.py" ]; then
+         case "${1}" in
+            /*)
+               d="${1}"
+            ;;
+            *)
+               d="$(readlink -f "${1}")"; : ${d:?}
+            ;;
+         esac
+
+         _pypath_add "${d}"
+      fi
+
+      shift
+   done
+}
+
+pypath_ifpush_pwd() {
+   while [ ${#} -gt 0 ]; do
+      [ -z "${1}" ] || pypath_ifpush "${PWD}/${1#/}"
+      shift
+   done
+}
+
+find_pyvers() {
+   v0=
+   local py
+   local ver
+
+   set --
+   for py in ${ROOT-}/usr/bin/python[0-9] ${ROOT-}/usr/bin/python[0-9].[0-9]; do
+      if [ -x "${py}" ]; then
+         ver="${py##*/python}"
+         set -- "${@}" "${ver}"
+      fi
+   done
+
+   [ ${#} -gt 0 ] || return 1
+   v0="${*}"
+}
+
+case "${1-}" in
+   '--install')
+      if [ -z "${2-}" ]; then
+         rel="${SCRIPT_FILENAME}"
+         D="${SCRIPT_DIR}"
+      else
+         rel="${SCRIPT_FILE}"
+         D="${2}"
+      fi
+
+      find_pyvers || exit 2
+
+      for pyver in ${v0}; do
+         ln -v -s -f -- "${rel}" "${D}/py${pyver}" || exit ${?}
+      done
+
+      exit 0
+   ;;
+
+   *)
+      pypath_ifpush_pwd "" "mod" "pymod" "pym"
+      printf "%s=%s\n" "PYTHONPATH" "\"${PYTHONPATH-}\""
+      exec "${PY}" "${@}"
+   ;;
+esac

@@ -1,0 +1,8 @@
+#!/bin/sh
+export LANG=C
+
+VNSTAT_USER=vnstat
+
+for iface in "${@}"; do
+   sudo -n -u "${VNSTAT_USER}" -- vnstat -u -i "${iface}"
+done

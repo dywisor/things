@@ -1,0 +1,10 @@
+#!/usr/bin/python
+import os
+import sys
+
+if __name__ == '__main__':
+   try:
+      for arg in filter(None, sys.argv[1:]):
+         sys.stdout.write(os.path.abspath(arg) + "\n")
+   except KeyboardInterrupt:
+      sys.exit(os.EX_OK^130)

@@ -1,0 +1,16 @@
+#!/bin/sh
+#  This script is (probably) only useful for Gentoo/Hardened systems.
+#
+: "${ARCH:=$(uname -m)}"
+: "${ARCH:?}"
+: "${LIBC:=gnu}"
+
+filter_vanilla_profile() {
+   awk -v "cc_tuple=${ARCH}-pc-linux-${LIBC}" \
+   '( $2 ~ (cc_tuple "-[0-9].*-vanilla$") ) { print $2; exit; }'
+}
+
+vanilla_profile="$( gcc-config -l | filter_vanilla_profile )"
+[ -n "${vanilla_profile}" ] || exit 9
+
+gcc-config -E "${vanilla_profile}"

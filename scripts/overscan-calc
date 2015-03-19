@@ -1,0 +1,244 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+#  Calculates a screen resolution that is
+#  slightly smaller than the given resolution
+#  (e.g. 720p with offset=40x40 -> 1200x640).
+#
+#  Useful when dealing with TV screens that do not support
+#  overscan/underscan.
+#
+#  Also features a script generation mode (--xrandr, --as-script).
+#
+#  See "overscan-calc --help" for usage.
+#
+from __future__ import absolute_import
+from __future__ import unicode_literals, division, generators
+from __future__ import print_function, nested_scopes, with_statement
+
+import argparse
+import math
+import os
+import re
+import sys
+
+
+
+SCREEN_RES_MAP = {
+   '1024'  : '1024x768',
+   '720p'  : '1280x720',
+   '1080p' : '1920x1080',
+}
+
+
+
+class Point ( object ):
+   @classmethod
+   def new_ident ( cls, k ):
+      return cls ( k, k )
+
+   def __init__ ( self, x, y ):
+      super ( Point, self ).__init__()
+      self.x = x
+      self.y = y
+
+   @property
+   def pixel ( self ):
+      return self.x * self.y
+
+   def __str__ ( self ):
+      return "{!s}x{!s}".format ( self.x, self.y )
+
+   def __eq__ ( self, other ):
+      return ( self.x == other.x and self.y == other.y )
+
+   def __ne__ ( self, other ):
+      return ( self.x != other.x or self.y != other.y )
+
+   def __add__ ( self, other ):
+      return self.__class__ ( self.x + other.x, self.y + other.y )
+
+   def __mul__ ( self, other ):
+      return self.__class__ ( other*self.x, other*self.y )
+
+   __rmul__ = __mul__
+
+   def __sub__ ( self, other ):
+      return self.__class__ ( self.x - other.x, self.y - other.y )
+
+   def __truediv__ ( self, other ):
+      return self.pixel / other.pixel
+
+   def __floordiv__ ( self, other ):
+      return self.pixel // other.pixel
+# --- end of Point (...) ---
+
+
+class IntPoint ( Point ):
+   def __init__ ( self, x, y ):
+      super ( IntPoint, self ).__init__ ( int(x), int(y) )
+
+
+IdentPoint = IntPoint.new_ident
+PointZero  = IdentPoint ( 0 )
+
+
+
+
+
+
+def get_parser():
+   re_psplit = re.compile ( "[^0-9+-]" )
+
+   def arg_is_a_point ( s ):
+      v = re_psplit.split ( s, 1 )
+      if len(v) == 1:
+         try:
+            return IdentPoint ( int(v[0]) if v[0] else 0 )
+         except ValueError:
+            pass
+
+      elif len(v) == 2:
+         try:
+            return IntPoint (
+               int(v[0]) if v[0] else 0,
+               int(v[1]) if v[1] else 0,
+            )
+         except ValueError:
+            pass
+
+      raise argparse.ArgumentTypeError ( s )
+   # --- end of arg_is_a_point (...) ---
+
+   def arg_is_resolution ( s ):
+      return arg_is_a_point (
+         SCREEN_RES_MAP[s] if ( s and s in SCREEN_RES_MAP ) else s
+      )
+
+   parser = argparse.ArgumentParser (
+      description = "overscan calculator"
+   )
+
+   parser.add_argument (
+      "resolution", type=arg_is_resolution,
+      help = (
+         'screen resolution in (width x height) '
+         'or a symbolic name ({names})'
+      ).format (
+         names = ', '.join (
+            sorted (
+               SCREEN_RES_MAP,
+               key = lambda x: ( 0 if (x and x[-1] == 'p') else 1, len(x) )
+            )
+         )
+      )
+   )
+
+   parser.add_argument (
+      "--offset", "-o", type=arg_is_a_point, default=None,
+      dest="offset_absolute",
+      help="overscan offset (width x height)"
+   )
+
+   parser.add_argument (
+      "--percentage", "-p", type=float, default=None,
+      dest="offset_percentage",
+      help="overscan offset as percentage"
+   )
+
+   parser.add_argument (
+      "--xrandr", nargs="?", type=str, default=False, const=True,
+      help="print result as xrandr command (for the given output device)",
+   )
+
+   parser.add_argument (
+      "--as-script", "-x", default=False, action="store_true",
+   )
+
+   return parser
+# --- end of get_parser (...) ---
+
+def main():
+   parser = get_parser()
+   config = parser.parse_args()
+
+   reso = config.resolution
+
+   abs_offset = config.offset_absolute or PointZero
+   rel_offset = PointZero
+   percentage = config.offset_percentage
+
+   if config.offset_absolute is None and percentage is None:
+      percentage = 2.
+
+   if percentage:
+      p = percentage / 100.
+      rel_offset = IdentPoint (
+         min ( math.ceil ( p * reso.x ), math.ceil ( p * reso.y ) )
+      )
+
+
+   total_offset = abs_offset + rel_offset
+   blankout     = total_offset * 2
+   final_res    = reso - blankout
+
+   if config.xrandr and (
+      config.xrandr is True
+      or config.xrandr.lower() not in { "0", "no", "disable" }
+   ):
+      alt_val      = lambda k, alt: ( alt if k is True else k )
+      gen_commands = lambda out: [
+         s.format ( out=out, res=final_res, off=total_offset ) for s in [
+            'xrandr --output {out!s} --fb  {res!s}',
+            'xrandr --output {out!s} --pos {off!s}',
+         ]
+      ]
+
+      if config.as_script:
+         script = (
+            '#!/bin/sh\noutput=\"{out!s}\"\n'.format (
+               out=alt_val ( config.xrandr, "${1:?}" )
+            )
+            + '\n'.join ( gen_commands ( "${output}" ) )
+            + '\n'
+         )
+         sys.stdout.write ( script )
+      else:
+         sys.stdout.write (
+            '\n'.join (
+               gen_commands ( alt_val ( config.xrandr, "${output}" ) )
+            )
+            + '\n'
+         )
+
+   elif config.as_script:
+      parser.error ( "-x,--as-script needs --xrandr [<output>]" )
+      return False ## unreachable
+
+   else:
+      sys.stdout.write (
+         (
+            'resolution = {res!s}\n'
+            'offset     = {off!s}\n'
+            'ratio      = {ratio:.1%}\n'
+            'loss       = {loss!s} pixels\n'
+         ).format (
+            res=final_res, off=total_offset, ratio=final_res/reso,
+            loss=blankout.pixel
+         )
+      )
+
+   return os.EX_OK
+
+if __name__ == '__main__':
+   try:
+      excode = main()
+   except KeyboardInterrupt:
+      excode = os.EX_OK ^ 130
+   else:
+      if excode is None or excode is True:
+         excode = os.EX_OK
+      elif excode is False:
+         excode = os.EX_OK ^ 1
+
+   sys.exit ( excode )

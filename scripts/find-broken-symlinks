@@ -1,0 +1,18 @@
+#!/bin/sh
+# Usage: find-broken-symlinks [<dir> [<dir>...]]
+#
+export LANG=C
+MAGIC_SEQUENCE="broken symbolic link to "
+
+filter()       { grep -F -- "${MAGIC_SEQUENCE}"; }
+
+if [ "${1:-X}" = "-s" ]; then
+shift
+pretty_print() { sed -r -e "s,([:])\s+(${MAGIC_SEQUENCE}).*\$,,"; }
+else
+pretty_print() { sed -r -e "s,([:])\s+(${MAGIC_SEQUENCE}), => ,"; }
+fi
+
+[ ${#} -gt 0 ] || set -- "${PWD}"
+
+{ find -H "${@}" -type l -print0 | xargs -r -0 file -s; } | filter | pretty_print

@@ -1,0 +1,102 @@
+#!/bin/sh
+# Usage: seed-tmpdir <user name> [--ignore-missing]
+#
+
+TMPDIR_SKEL_TARBALL_SRCDIR="/var/local/tmpskel"
+USER_TMPROOT="/tmp/users"
+# ---
+
+_die() {
+   printf '%s\n' "Error: ${1:-%undef%}" 1>&2
+   exit ${2:-2}
+}
+
+user_name="${1:?}"
+ignore_missing=false
+case "${2-}" in
+   '')
+      true
+   ;;
+   '--ignore-missing')
+      ignore_missing=true
+   ;;
+   *)
+      _die "Unknown option: ${*}" 64
+   ;;
+esac
+
+
+uid="$(id -u "${user_name}")"
+gid="$(id -g "${user_name}")"
+
+[ -n "${uid}" ] && [ -n "${gid}" ] || \
+   _die "Failed to get uid/gid for user ${user_name}"
+
+sym_tmpdir="${USER_TMPROOT}/${user_name}"
+D="${USER_TMPROOT}/@BY-UID/${uid}"
+f="${TMPDIR_SKEL_TARBALL_SRCDIR}/${user_name}.txz"
+
+# _dodir ( dirpath, mode, owner, [mkdir_opts] )
+_dodir() {
+   mkdir ${4-} -- "${1:?}" && \
+   chmod -- "${2:?}" "${1:?}" && \
+   chown -- "${3:?}" "${1:?}"
+}
+
+_must_be_real_dir() {
+   if [ -d "${1:?}" ]; then
+      if [ -h "${1:?}" ]; then
+         _die "directory ${1} must not be a symlink." 21
+      fi
+      return 0
+   else
+      _die "${1} is not a directory." 20
+   fi
+}
+
+# create tmpdir root if necessary
+if [ ! -e "${USER_TMPROOT}" ]; then
+   rm -f -- "${USER_TMPROOT}"
+
+   case "${USER_TMPROOT}" in
+      /*/users)
+         mkdir -p -m 0755 -- "${USER_TMPROOT%/*}" && _dodir "${USER_TMPROOT}" 0711 0:0 || \
+            _die "failed to create tmpdir root ${USER_TMPROOT}" 90
+      ;;
+      *)
+         _die "cannot create tmpdir root ${USER_TMPROOT} (not implemented)" 91
+      ;;
+   esac
+fi
+
+# sanity check
+_must_be_real_dir "${USER_TMPROOT}"
+
+
+# create user tmpdir if necessary
+if [ ! -e "${D}" ]; then
+   rm -f -- "${D}"
+
+   _dodir "${D}" 0700 "${uid}:${gid}" || \
+      _die "failed to create ${D}"
+
+   ln -f -s -- "@BY-UID/${uid}" "${sym_tmpdir}" || _die "failed to create symlink"
+fi
+
+# sanity check #2
+_must_be_real_dir "${D}"
+
+
+# check for tmpdir skel file after creating the empty tmpdir
+#
+if [ -f "${f}" ]; then
+   # unpack tmpdir seed
+   tar xap -C "${D}/" -f "${f}"
+
+elif ${ignore_missing}; then
+   true
+
+else
+   _die "tmpdir skel file ${f} does not exist" 22
+fi
+

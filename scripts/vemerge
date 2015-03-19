@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/emerge --quiet=n --quiet-build=n --jobs 1 --verbose "${@}"

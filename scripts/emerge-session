@@ -1,0 +1,72 @@
+#!/bin/sh
+# "Hardwired" screen wrapper. See also "screen-attach-or-run".
+#
+# Note: "sh -c CODE [ARG0 [ARG...]]" -- need to specify a prog name (ARG0)
+#
+set -u
+
+: "${X_SCREEN:=screen}"
+session_name="emerge-session"
+
+while [ ${#} -gt 0 ]; do
+   case "${1}" in
+      '')
+         exit 64
+      ;;
+      --fg)
+         SCREEN_REATTACH_ONLY=y
+      ;;
+      --bg)
+         SCREEN_IN_BG=y
+      ;;
+      *)
+         break
+      ;;
+   esac
+   shift || exit
+done
+
+list_screen_sessions() {
+"${X_SCREEN}" -ls | \
+awk -v name="${1:-.+}" \
+'( ($0 ~ "^\\s") && ($1 ~ ("^[0-9]+[.]" name "$")) ) { print $1; }'
+}
+
+# if there's an active emerge session
+# and we're not told to forcefully create a new one, (re)attach to it.
+if [ "${FORCE_NEW_SESSION:-X}" != "y" ]; then
+   session="$( list_screen_sessions "${session_name}" | head -n 1 )"
+
+   if [ -n "${session}" ]; then
+      printf '%s\n' "Attaching to existing ${session_name}"
+
+      [ "${SCREEN_IN_BG:-X}" != "y" ] || exit 0
+
+      exec "${X_SCREEN}" -d -r -S "${session}"
+      exit 99 ## unreachable
+   fi
+fi
+
+if [ "${SCREEN_REATTACH_ONLY:-X}" = "y" ]; then
+   exit 1
+fi
+
+# create a new session
+
+# session command:
+set -- \
+sh -c '
+[ ${#} -gt 0 ] || set -- -vuDN --keep-going --ask @world
+set -- /usr/bin/emerge "${@}"
+printf "%s\n" "${*}"
+( exec "${@}"; ); export RET=${?};
+exec ${SHELL:-/sh}' \
+"${session_name}" "${@}"
+
+printf '%s\n' "Creating new ${session_name}"
+
+if [ "${SCREEN_IN_BG:-X}" = "y" ]; then
+   exec "${X_SCREEN}" -d -m -S "${session_name}" -- "${@}"
+else
+   exec "${X_SCREEN}" -S "${session_name}" -- "${@}"
+fi

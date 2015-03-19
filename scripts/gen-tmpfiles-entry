@@ -1,0 +1,139 @@
+#!/bin/sh
+# Usage: gen-tmpfiles-entry <fspath>...
+#
+#  Creates tmpfiles.d entries for the given files/dirs.
+#  Writes the resulting file to stdout.
+#
+#  Shell script variant:
+#  * can only handle regular files, dirs and symlinks
+#  * no options accepted.
+#
+set -u
+
+readonly ARGPARSE_BREAK_MARKER="--"
+
+
+_print() { printf "%s\n" "${*}"; }
+
+die() {
+   _print "${1:+died: }${1:-died.}" 1>&2
+   exit ${2:-2}
+}
+
+autodie() { "${@}" || die "'${*}' returned ${?}." ${?}; }
+
+eval_stat() {
+   : ${1:?}
+   st_mode=; st_group=; st_user=;
+   #set -- $( stat -c '%04a %G %U' "${1}" ) || return 1
+   set -- $( stat -c '%a %G %U' "${1}" ) || return 1
+
+   st_mode="${1:?}"
+   st_group="${2:?}"
+   st_user="${3:?}"
+}
+
+zap_entry_data() {
+   entry_type=
+   entry_path=
+   entry_mode=
+   entry_user=
+   entry_group=
+   entry_age=
+   entry_arg=
+}
+
+get_entry_data() {
+   : ${1:?}
+   zap_entry_data
+
+   if test -h "${1}"; then
+      entry_type="L"
+      entry_arg="$(readlink "${1}")" || die "readlink"
+      : ${entry_arg:?}
+
+   elif test -f "${1}"; then
+      entry_type="f"
+
+   elif test -d "${1}"; then
+      entry_type="d"
+
+   elif test ! -e "${1}"; then
+      die "cannot process non-existent arg '${1}'"
+
+   else
+       _print "cannot process arg '${1}' due to unsupported type - skipping!" 1>&2
+       return 1
+   fi
+
+   autodie eval_stat "${1}"
+
+   entry_path="${1}"
+   entry_mode="${st_mode}"
+   entry_user="${st_user}"
+   entry_group="${st_group}"
+
+   return 0
+}
+
+print_entry_data() {
+   local mode_fmt
+
+   if [ -n "${entry_mode}" ]; then
+      mode_fmt="%04d"
+   else
+      mode_fmt="%s"
+   fi
+
+   printf "%s %s ${mode_fmt} %s %s %s %s\n" \
+      "${entry_type:?}" \
+      "${entry_path:?}"  \
+      "${entry_mode:--}" \
+      "${entry_user:--}" \
+      "${entry_group:--}" \
+      "${entry_age:--}" \
+      "${entry_arg:--}"
+}
+
+print_entry_header() {
+   printf "# automatically generated file\n#\n"
+}
+
+process_arg() {
+   if get_entry_data "${1}"; then
+      if [ -n "${is_first_entry}" ]; then
+         print_entry_header
+         is_first_entry=
+      fi
+
+      print_entry_data
+   fi
+   return 0
+}
+
+set -- "${@}" "${ARGPARSE_BREAK_MARKER}"
+while [ $# -gt 0 ]; do
+   case "${1}" in
+      --|"${ARGPARSE_BREAK_MARKER}")
+         shift || die
+         break
+      ;;
+      -*)
+         die "unknown option '${1}'" 64
+      ;;
+      *)
+         set -- "${@}" "${1}"
+      ;;
+   esac
+
+   shift || die
+done
+
+is_first_entry=Y
+while [ $# -gt 0 ]; do
+   if [ "${1}" != "${ARGPARSE_BREAK_MARKER}" ]; then
+      process_arg "${1}" || die "failed to process '${1}'"
+   fi
+   # else assert $# -eq 1
+   shift || die
+done

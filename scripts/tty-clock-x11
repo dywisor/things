@@ -1,0 +1,60 @@
+#!/bin/sh
+# Usage: tty-clock-x11
+#
+#  Starts/Stops a small xterm window that displays the output of tty-clock.
+#
+
+set -u
+{ hash -r tty-clock || command -v tty-clock; } 1>/dev/null 2>&1 || exit 9
+
+uid="$(id -u 2>/dev/null)"; : "${uid:?}"
+
+## get_env_var $(pidof desktop-session) TMPDIR   and use that
+STATUS_DIR="/tmp/.tty-clock_${uid}"
+
+TTY_CLOCK_OPTS="-s -C 7"
+XTERM_OPTS="-title clock -class TTYCLOCK -bg black -geometry 57x08"
+
+
+_release_lock() { trap - INT TERM EXIT; rm -f -- "${STATUS_DIR}/lock"; }
+
+
+# Create status dir
+mkdir -m 0750 -- "${STATUS_DIR}" 2>/dev/null || [ -d "${STATUS_DIR}" ] || exit
+
+# Acquire lock
+if ! ln -s -- "/proc/$$" "${STATUS_DIR}/lock" 2>/dev/null; then
+   printf '%s\n' "Cannot claim lock" 1>&2
+   exit 200
+fi
+
+trap _release_lock INT TERM EXIT
+
+# Stop tty-clock if it is running - read pidfile
+if { read -r pid < "${STATUS_DIR}/pid"; } 2>/dev/null; then
+   # pidfile exists
+
+   if [ -n "${pid}" ] && [ -e "/proc/${pid}" ] && kill -15 "${pid}"; then
+      # Stopped tty-clock, remove pidfile and exit
+      printf '%s\n' K
+      rm -f -- "${STATUS_DIR}/pid"
+      exit 0
+   fi
+
+   # stale or empty pidfile, delete it
+   rm -f -- "${STATUS_DIR}/pid"
+fi
+
+# Start tty-clock
+xterm ${XTERM_OPTS} -e "tty-clock ${TTY_CLOCK_OPTS} </dev/null" &
+pid=$!
+
+if [ -n "${pid}" ] && [ -e "/proc/${pid}" ]; then
+   printf '%s\n' S
+   printf '%s\n' "${pid}" > "${STATUS_DIR}/pid" || exit
+   exit 0
+
+else
+   printf '%s\n' U
+   exit 2
+fi

@@ -1,0 +1,25 @@
+#!/bin/sh
+# Usage: gitgc [<git_subdir>]
+#
+if [ -n "${1-}" ] || [ -z "${GIT_DIR-}" ]; then
+   cd -P "${1:-.}" || exit 91
+
+   GIT_DIR="${PWD}/.git"
+   while [ ! -e "${GIT_DIR}" ]; do
+      cd -P .. && [ "${PWD}" != "/" ] || exit 90
+      GIT_DIR="${PWD}/.git"
+   done
+fi
+
+[ -e "${GIT_DIR}" ] || exit 92
+
+printf '%s\n' "*** gc ***"
+git gc || exit
+du -hsxc "${GIT_DIR}"
+
+printf '%s\n' "*** gc --aggressive ***"
+git gc --aggressive || exit
+du -hsxc "${GIT_DIR}"
+
+printf '%s\n' "*** fsck ***"
+git fsck || exit

@@ -1,0 +1,15 @@
+#!/bin/sh
+# This is an rsync wrapper that deals with quirky rsync servers
+# running on Synology devices.
+#
+have_rsh=
+for arg in "${@}"; do
+   case "${arg}" in
+      -e|--rsh|--rsh=*) have_rsh=y; break ;;
+      #--|*' '*) : ;;
+      #-*e*) have_rsh=y; break ;;
+   esac
+done
+
+[ -n "${have_rsh}" ] || set -- -e ssh "${@}"
+exec /usr/bin/rsync --rsync-path=/usr/syno/bin/rsync "${@}"

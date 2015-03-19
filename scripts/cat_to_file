@@ -1,0 +1,6 @@
+#!/bin/sh
+# Usage: cat_to_file dstfile [args...]
+#  Same as "cat [$2...] > $1"
+#
+f="${1:?}"; shift
+exec cat "${@}" > "${f}"

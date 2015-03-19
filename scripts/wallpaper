@@ -1,0 +1,3 @@
+#!/bin/sh
+# Usage: wallpaper <file>
+feh --bg-scale "${1:?}" &

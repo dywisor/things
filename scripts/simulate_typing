@@ -1,0 +1,3 @@
+#!/bin/sh
+#  Usage: simulate-typing text...
+printf '%s\n' "${*}" | pv -qL 10
