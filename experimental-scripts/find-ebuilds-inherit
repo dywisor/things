@@ -1,0 +1,69 @@
+#!/bin/sh
+set -u
+
+portroot="$( portageq envvar ROOT )"; : "${portroot:?}"
+portdir="$( portageq get_repo_path "${portroot}" gentoo )"; : "${portdir:?}"
+
+cd "${portdir}" || exit
+
+inherits=
+package_env=
+
+inherits="${inherits}|${1}"
+
+while [ ${#} -gt 0 ]; do
+   case "${1}" in
+      '')
+         exit 64
+      ;;
+
+      '-E'|'--env')
+         package_env="${package_env} ${2:?}"
+         shift 2 || exit
+      ;;
+
+      '--')
+         shift
+         break
+      ;;
+
+      '-'*)
+         exit 64
+      ;;
+
+      *)
+         inherits="${inherits}|${1}"
+         shift
+      ;;
+   esac
+done
+
+while [ ${#} -gt 0 ]; do
+   inherits="${inherits}|${1:?}"
+   shift
+done
+
+inherits="${inherits#|}"
+inherits="(${inherits:?})"
+
+package_env="${package_env# }"
+
+
+find_inherits() {
+   find . -type f -name "*.ebuild" | \
+      xargs grep -lE -- "^\\s*inherit\\s(.+\\s)?${inherits}(\s|\$)" | \
+      sed -r -e 's,^[.]/,,'
+}
+
+
+if [ -z "${package_env}" ]; then
+   find_inherits
+else
+   find_inherits | \
+      cut -d / -f 1,3 | \
+      sed -r \
+         -e 's,[.]ebuild$,,' \
+         -e 's,^,=,' \
+         -e "s|\$| ${package_env}|"
+fi
+
