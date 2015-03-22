@@ -26,6 +26,11 @@ case "${-}" in
                   systemd-nspawn)
                      want_fancy_ps1=true
                   ;;
+                  *)
+                     if { systemd-detect-virt -q -c; } 1>/dev/null 2>&1; then
+                        want_fancy_ps1=true
+                     fi
+                  ;;
                esac
             ;;
          esac
