@@ -18,7 +18,7 @@ if __name__ == '__main__':
       rets = applet(*(sys.argv[2:]))
 
    except TypeError:
-      raise
+      ##raise
       sys.exit(os.EX_USAGE)
 
    except OSError:
