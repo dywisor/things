@@ -92,8 +92,9 @@ Options:
   -X, --settle-success <seconds>   sleep <seconds> if <command> succeeded [0]
   -x, --settle-fail    <seconds>   sleep <seconds> if <command> failed [0]
   -p, --cmd-pidfile    <file>      write the command\'s pid to <file> [False]
-  -1, --stdout         <file>      redirect stdout to <file> [False]
-  -2, --stderr         <file>      redirect stderr to <file> [False]
+  --keep-stdin                     do not redirect stdin to /dev/null
+  -1, --stdout         <file>      redirect command's stdout to <file> [False]
+  -2, --stderr         <file>      redirect command's stderr to <file> [False]
 
 Passing \"--\" or \"\" as <pidfile> disables locking.
 Multiple --settle options accumulate (\"-t 3 -t -2\" is the same as \"-t 1\").
@@ -219,23 +220,50 @@ sub lock_pidfile {
    }
 }
 
-# int system_write_pidfile ( $pidfile, \@argv )
+# int system_write_pidfile (
+#    $pidfile, $redirect_stdout, $redirect_stderr, \@argv
+# )
 #
 #  Provides functionality similar to system(), but writes the command's
 #  process id to a file (and empties the file when the command is done).
 #
 sub system_write_pidfile {
-   my $pidfile = $_[0];
-   my @argv    = @{$_[1]};
-   my $fh      = undef;
-   my $pid     = fork();
-   my $ret     = -1;
+   my $pidfile      = $_[0];
+   my $redir_stdout = (defined $_[1]) ? $_[1] : "";
+   my $redir_stderr = (defined $_[2]) ? $_[2] : "";
+   my @argv         = @{$_[3]};
+   my $fh           = undef;
+   my $pid          = fork();
+   my $ret          = -1;
 
    if ( $pid == 0 ) {
       # child process: exec argv
 
       # don't get trapped (just to be sure)
       $LOCKFILE_FH = undef;
+
+      if ( $redir_stdout ) {
+         if ( $redir_stdout eq $redir_stderr ) {
+            my $stdx;
+            open ( $stdx, ">", $redir_stdout )
+               or die "Failed to open stdout/stderr dst: $!";
+
+            open ( STDOUT, ">&", $stdx )
+               or die "Failed to redirect stdout: $!";
+
+            open ( STDERR, ">&", $stdx )
+               or die "Failed to redirect stderr: $!";
+
+         } else {
+            open ( STDOUT, ">", $redir_stdout )
+               or die "Failed to redirect stdout: $!";
+         }
+      }
+
+      if ( $redir_stderr && ($redir_stderr ne $redir_stdout) ) {
+         open ( STDERR, ">", $redir_stderr )
+            or die "Failed to redirect stderr: $!";
+      }
 
       exec { $argv[0] } @argv;
       die;
@@ -315,18 +343,21 @@ sub handle_settle_option {
 # int main ( \@argv ), raises die()
 #
 sub main {
-   my @argv           = @{$_[0]};
-   my $settle_before  = 0;
-   my $settle_after   = 0;
-   my $settle_success = 0;
-   my $settle_fail    = 0;
-   my $pidfile        = undef;
-   my $pidfile_fh     = undef;
-   my $retcode        = 0;
-   my $flock_flags    = LOCK_EX|LOCK_NB;
-   my $daemonize      = 1;
-   my $daemon_pid     = undef;
-   my $cmd_pidfile    = undef;
+   my @argv            = @{$_[0]};
+   my $settle_before   = 0;
+   my $settle_after    = 0;
+   my $settle_success  = 0;
+   my $settle_fail     = 0;
+   my $pidfile         = undef;
+   my $pidfile_fh      = undef;
+   my $retcode         = 0;
+   my $flock_flags     = LOCK_EX|LOCK_NB;
+   my $daemonize       = 1;
+   my $daemon_pid      = undef;
+   my $cmd_pidfile     = undef;
+   my $redirect_stdin  = undef;
+   my $redirect_stdout = undef;
+   my $redirect_stderr = undef;
 
    # _partially_ parse args until pidfile is set
    #   given($arg) { when($option) ... } ...
@@ -365,6 +396,16 @@ sub main {
       } elsif ( &is_opt ( \@argv, "--cmd-pidfile", "-p" ) ) {
          &handle_str_option ( \@argv, $cmd_pidfile );
 
+      } elsif ( &is_opt ( \@argv, "--keep-stdin" ) ) {
+         shift(@argv);
+         $redirect_stdin = 0;
+
+      } elsif ( &is_opt ( \@argv, "--stdout", "-1" ) ) {
+         &handle_str_option ( \@argv, $redirect_stdout );
+
+      } elsif ( &is_opt ( \@argv, "--stderr", "-2" ) ) {
+         &handle_str_option ( \@argv, $redirect_stderr );
+
       } elsif ( &is_opt ( \@argv, "--help", "-h" ) ) {
          print $usage;
          return 0;
@@ -388,6 +429,9 @@ sub main {
    # check if there's a command to be run
    @argv or die "Usage: $short_usage\n\nno command specified";
 
+   # set default $redirect_stdin
+   if ( ! defined $redirect_stdin ) { $redirect_stdin = "/dev/null"; }
+
    # create $pidfile, $cmd_pidfile dirs
    foreach ($pidfile, $cmd_pidfile) {
       if ($_) {
@@ -405,7 +449,11 @@ sub main {
       umask ( S_IWGRP|S_IWOTH );
       setsid()   or die "setsid failed: $!";
       chdir("/") or die "chdir / failed: $!";
-      # COULDFIX: close stdin/out/err
+   }
+
+   # redirect stdin? [after daemonizing.]
+   if ( (defined $redirect_stdin) && $redirect_stdin ) {
+      open ( STDIN, "<", $redirect_stdin ) or die "Failed to redirect stdin: $!";
    }
 
    # let things settle (pre-lock)
@@ -425,7 +473,11 @@ sub main {
    sleep ( $settle_after ) if ( $settle_after > 0 );
 
    # run command, get retcode
-   $retcode = system_write_pidfile ( $cmd_pidfile, \@argv ) >> 8;
+   $retcode = (
+      system_write_pidfile (
+         $cmd_pidfile, $redirect_stdout, $redirect_stderr, \@argv
+      ) >> 8
+   );
 
    # let things settle (post-exec)
    if ( $retcode < 0 ) {
