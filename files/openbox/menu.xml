@@ -3,6 +3,12 @@
 <openbox_menu xmlns="http://openbox.org/3.4/menu">
 
 <menu id="system-menu" label="System">
+   <item label="Screen Setup">
+      <action name="Execute">
+         <command>arandr</command>
+         <startupnotify><enabled>yes</enabled></startupnotify>
+      </action>
+   </item>
    <item label="Openbox Configuration Manager">
       <action name="Execute">
          <command>obconf</command>
