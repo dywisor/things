@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals, division, generators
 from __future__ import print_function, nested_scopes, with_statement
 
+import io
 import os
 import sys
 import pwd
@@ -32,7 +33,7 @@ def main(argv):
    myname_file = home + os.sep + '.myname'
    fh = None
    try:
-      fh = open(myname_file, 'r')
+      fh = io.open(myname_file, 'r', encoding='utf-8')
       myname = [ w for w in fh.readline().strip().split(None) if w ]
    except OSError:
       return 5
