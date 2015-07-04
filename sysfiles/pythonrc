@@ -13,6 +13,7 @@ import itertools
 import functools
 import math
 import glob
+import fnmatch
 import re
 import string
 import weakref
@@ -35,3 +36,5 @@ try:
    import numpy
 except ImportError:
    pass
+
+recomp = re.compile
