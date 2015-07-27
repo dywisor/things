@@ -93,7 +93,7 @@ endef
 ###
 define _C_LIB_DEF_VERSIONED
 $(call _C_LIB_VARS_DEF,$(1),$(2),$(3))
-$(call _C_LIB_OBJ_STD_BUILD_DEF,$(1),$(4))
+$(call _C_LIB_OBJ_STD_BUILD_DEF,$(1),$(2),$(4))
 $(call _C_LIB_OBJ_STD_INSTALL_DEF_VERSIONED,$(1))
 endef
 ### END;
@@ -103,7 +103,7 @@ endef
 ###
 define _C_LIB_DEF_UNVERSIONED
 $(call _C_LIB_VARS_DEF,$(1),$(2),$(3))
-$(call _C_LIB_OBJ_STD_BUILD_DEF,$(1),$(4))
+$(call _C_LIB_OBJ_STD_BUILD_DEF,$(1),$(2),$(4))
 $(call _C_LIB_OBJ_STD_INSTALL_DEF__UNVERSIONED,$(1))
 endef
 ### END;
