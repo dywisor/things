@@ -1,0 +1,10 @@
+unexport LC_ALL
+LC_COLLATE=C
+LC_NUMERIC=C
+export LC_COLLATE LC_NUMERIC
+
+SHELL ?= sh
+
+COMMA := ,
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)

@@ -1,0 +1,132 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# This file is part of @@PROG_NAME@@.
+#
+
+from __future__ import absolute_import
+from __future__ import unicode_literals, division, generators
+from __future__ import print_function, nested_scopes, with_statement
+
+import io
+import os
+import re
+import sys
+
+def open_text_file ( fp, mode, **kwargs ):
+   kwargs.setdefault ( 'encoding', 'utf-8' )
+   return io.open ( fp, mode.rstrip("bt") + "t", **kwargs )
+# --- end of open_text_file (...) ---
+
+
+class HashbangExtractor ( object ):
+   def __init__ ( self ):
+      super ( HashbangExtractor, self ).__init__()
+      self.re_hashbang = re.compile (
+         '^[#][!]\s*'
+         '(?P<prog>(?:.*[/])?(?P<prog_name>[^/\s]+))'
+         '(?:\s+(?P<args>\S.*))?'
+         '\s*$'
+      )
+
+   def extract_hashbang_from_lines ( self, lines ):
+      match_hashbang = self.re_hashbang.match
+
+      for line in lines:
+         rsline = line.rstrip()
+
+         m = match_hashbang ( rsline )
+         if m:
+            return m.groupdict()
+
+         sline = rsline.lstrip()
+         if sline and sline[0] != '#':
+            break
+      # -- end for
+
+      return None
+   # --- end of extract_hashbang_from_lines (...) ---
+
+   def extract_hashbang_from_file ( self, filepath ):
+      try:
+         with open_text_file ( filepath, "r" ) as fh:
+            hb = self.extract_hashbang_from_lines ( fh )
+
+      except ( IOError, OSError, UnicodeDecodeError ):
+         return None
+
+      else:
+         return hb
+   # --- end of extract_hashbang_from_file (...) ---
+
+   def _get_prog_name_from_hashbang ( self, hb_vars ):
+      if hb_vars:
+         argv = [ hb_vars ['prog_name'] ]
+         argv.extend ( (hb_vars ['args'] or '').split() )
+
+         for w in argv:
+            if not w:
+               pass
+
+            elif w[0] in "+-":
+               break
+
+            elif (
+               w == 'env'
+               or w.startswith('busybox') or w.startswith('bb')
+            ):
+               pass
+
+            else:
+               return w
+         # -- end for
+      # -- end if
+
+      return None
+   # --- end of _get_prog_name_from_hashbang (...) ---
+
+   def extract_hashbang_prog_name_from_file ( self, filepath ):
+      return self._get_prog_name_from_hashbang (
+         self.extract_hashbang_from_file ( filepath )
+      )
+   # --- end of extract_hashbang_prog_name_from_file (...) ---
+
+# --- end of HashbangExtractor ---
+
+
+def main ( prog, argv ):
+   hbex_obj = HashbangExtractor()
+   _os_sep  = os.sep
+
+   check_is_shell_hashbang = (
+      lambda fpath,
+         _get_prg=hbex_obj.extract_hashbang_prog_name_from_file,
+         _prgv=frozenset([ 'bash', 'dash', 'ash', 'sh' ]):
+            _get_prg ( fpath ) in _prgv
+   )
+
+   for dir_arg in ( argv or [ "." ] ):
+      for dirpath, dirnames, filenames in os.walk ( dir_arg ):
+         for fname in filenames:
+            fpath = dirpath + _os_sep + fname
+
+            if fname[-3:] == '.sh' or check_is_shell_hashbang ( fpath ):
+               print ( fpath )
+         # -- end for
+      # -- end for
+   # -- end for
+# --- end of main (...) ---
+
+if __name__ == '__main__':
+   try:
+      excode = main ( sys.argv[0], sys.argv[1:] )
+   except KeyboardInterrupt:
+      excode = os.EX_OK ^ 130
+   else:
+      if excode is None or excode is True:
+         excode = os.EX_OK
+      elif excode is False:
+         excode = os.EX_OK ^ 1
+   # -- end try
+
+   sys.exit ( excode )

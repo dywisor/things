@@ -1,0 +1,17 @@
+__PRJROOT := $(strip $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+FIMKLIB   := $(__PRJROOT)/fimklib
+
+#PRJ_USE_C        = 1
+#PRJ_USE_SHELLGEN = 1
+
+DEFAULT_TARGET = my_prog
+# actual rules go to <__PRJROOT>/rules.mk
+
+
+include $(FIMKLIB)/fimklib.mk
+
+
+
+
+
+
