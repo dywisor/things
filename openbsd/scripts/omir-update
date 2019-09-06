@@ -1,0 +1,68 @@
+#!/bin/sh
+set -fu
+
+omir_init_env() {
+	unset -v OMIR_FILTER_LIST
+	unset -v UPSTREAM_MIRROR_URI
+	unset -v UPSTREAM_FW_URI
+	unset -v FILES_ROOT
+	unset -v OMIR_DIR
+
+	CONFDIR="${HOME:?}/etc"
+
+	if [ -r "${CONFDIR}/omir.conf" ]; then
+		. "${CONFDIR}/omir.conf" || return 8
+	fi
+
+	: "$POMIR_FILTER_LIST:="${CONFDIR}/omir.list"}"
+
+	: "${UPSTREAM_MIRROR_URI:='rsync://mirror.leaseweb.com/openbsd/'}"
+	: "${UPSTREAM_FW_URI:='http://firmware.openbsd.org/firmware'}"
+
+	: "${FILES_ROOT:='/srv/mirror'}"
+
+	: "${OMIR_DIR:="${FILES_ROOT}/OpenBSD"}"
+}
+
+
+omir_fetch_openbsd_release() {
+	rsync \
+		-rv \
+		--delete --delete-delay --delay-updates --fuzzy \
+		--exclude '.~tmp~' --exclude '.*' \
+		\
+		--filter ". ${OMIR_FILTER_LIST}" \
+		\
+		-- "${UPSTREAM_MIRROR_URI%/}/" "${OMIR_DIR%/}/"
+}
+
+
+omir_fetch_openbsd_firmware() {
+	mkdir -p -- "${OMIR_DIR}/firmware/" && \
+	cd "${OMIR_DIR}/firmware/" && \
+	lftp -e 'mirror 6.5; exit' "${UPSTREAM_FW_URI}"
+}
+
+
+omir_regen_random_seed() {
+	dd if=/dev/random of="${PXE_ETC}/random.seed" bs=512 count=1 conv=fsync
+}
+
+
+omir_regen_index() {
+	find "${OMIR_DIR}/" -type d -not -empty -print0 \
+		| xargs -0 -r -n 1 sh -c 'cd "${1}" && command ls -ln | grep -v "index[.]txt$" > ./index.txt' _
+}
+
+
+omir_main_update_mirror() {
+	mkdir -p -- "${OMIR_DIR}" || return 2
+	omir_fetch_openbsd_firmware || return
+	omir_fetch_openbsd_release || return
+	omir_regen_index || return
+}
+
+
+omir_init_env || exit
+
+omir_main_update_mirror || exit
